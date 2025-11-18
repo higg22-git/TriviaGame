@@ -311,6 +311,34 @@
             setGamePhase('finished');
         };
 
+        const toggleFullscreen = () => {
+            const element = document.documentElement; // Target the whole HTML element
+
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+                // Exit fullscreen
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.mozCancelFullScreen) { // Firefox
+                    document.mozCancelFullScreen();
+                } else if (document.webkitExitFullscreen) { // Chrome, Safari and Opera
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { // IE/Edge
+                    document.msExitFullscreen();
+                }
+            } else {
+                // Enter fullscreen
+                if (element.requestFullscreen) {
+                    element.requestFullscreen();
+                } else if (element.mozRequestFullScreen) { // Firefox
+                    element.mozRequestFullScreen();
+                } else if (element.webkitRequestFullscreen) { // Chrome, Safari and Opera
+                    element.webkitRequestFullscreen();
+                } else if (element.msRequestFullscreen) { // IE/Edge
+                    element.msRequestFullscreen();
+                }
+            }
+        };
+
         const getCategories = () => {
             const counts = {};
             RAW_QUESTIONS.forEach(q => {
@@ -540,17 +568,19 @@
                                 ))}
                             </div>
                             
-                            {/* Manual End Game Button */}
-                            <div className="mt-12">
-                                {getCategories().length === 0 ? (
-                                    <h3 className="text-2xl text-slate-400">All questions used!</h3>
-                                ) : (
-                                    <button onClick={endGameEarly} className="px-6 py-2 bg-slate-700 text-red-400 rounded-lg font-bold hover:bg-slate-600 transition">
-                                        End Game
-                                    </button>
-                                )}
+                            {/* Control Buttons */}
+                            <div className="mt-12 flex justify-center space-x-4">
+                                
+                                <button onClick={endGameEarly} className="px-6 py-2 bg-slate-700 text-red-400 rounded-lg font-bold hover:bg-slate-600 transition">
+                                    End Game
+                                </button>
+                                
+                                <button onClick={toggleFullscreen} className="px-6 py-2 bg-blue-700 text-white rounded-lg font-bold hover:bg-blue-600 transition">
+                                    Toggle Fullscreen
+                                </button>
+
                                 {getCategories().length === 0 && (
-                                    <button onClick={() => setGamePhase('finished')} className="mt-4 ml-4 px-8 py-3 bg-blue-600 rounded text-white font-bold">Show Final Results</button>
+                                    <button onClick={() => setGamePhase('finished')} className="px-8 py-3 bg-blue-600 rounded text-white font-bold">Show Final Results</button>
                                 )}
                             </div>
                         </div>
