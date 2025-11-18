@@ -238,10 +238,18 @@
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
+                    let initialPhase = p.gamePhase;
+
+                    // FIX: If the saved phase is 'rules' (the interstitial page),
+                    // drop back to 'setup' so the user must click 'Start Game' again.
+                    if (initialPhase === 'rules') {
+                        initialPhase = 'setup';
+                    }
+
                     setTeams(p.teams);
                     setOwnerTeamIdx(p.ownerTeamIdx);
                     setUsedQuestionIds(p.usedQuestionIds);
-                    setGamePhase(p.gamePhase);
+                    setGamePhase(initialPhase); // Use the corrected initialPhase
                     setQuizQueue(p.quizQueue);
                     setQuizQIdx(p.quizQIdx);
                     setAttemptOffset(p.attemptOffset);
