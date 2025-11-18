@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Church Trivia - Challenge Mode</title>
+    <title>Church Trivia</title>
+    
+    <!-- Favicon (Simple Cross/Trophy Icon) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✝</text></svg>">
     
     <!-- React and ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -46,6 +49,13 @@
         }
         .timer-bar {
             transition: width 1s linear, background-color 1s linear;
+        }
+        .animate-winner {
+            animation: winnerScale 1s infinite alternate;
+        }
+        @keyframes winnerScale {
+            0% { transform: scale(1); box-shadow: 0 0 15px rgba(255, 215, 0, 0.5); }
+            100% { transform: scale(1.05); box-shadow: 0 0 30px rgba(255, 215, 0, 0.9); }
         }
     </style>
 </head>
@@ -158,14 +168,19 @@
         "LDS Lifestyle": "bg-green-600 border-green-400 text-white",
         "Pop Culture": "bg-purple-600 border-purple-400 text-white",
         "Mission Prep": "bg-red-600 border-red-400 text-white",
-        "Church History": "bg-yellow-600 border-yellow-400 text-black",
+        // UPDATED: Changed from yellow-600/yellow-400 (light) to amber-800/amber-600 (darker) to ensure white text visibility.
+        "Church History": "bg-amber-800 border-amber-600 text-white", 
         "Default": "bg-gray-700 border-gray-500 text-white"
     };
 
     const TeamCard = ({ name, score, color, isActive, isStealing }) => (
         <div className={`relative flex flex-col items-center p-4 rounded-lg border-4 transition-all duration-300 
             ${isActive || isStealing ? 'scale-110 shadow-xl' : 'opacity-60 border-transparent scale-95'} 
-            ${color}
+            ${// UPDATED: Use white text for the amber team
+                color === 'bg-amber-800 text-white' ? 'bg-amber-800' : 
+                color === 'bg-yellow-500 text-black' ? 'bg-amber-700 text-white' : // Change team color 4
+                color
+            }
             ${isStealing ? 'border-white ring-4 ring-yellow-400' : ''}
             ${isActive && !isStealing ? 'border-white' : ''}
         `}>
@@ -194,7 +209,8 @@
             { id: 0, name: "Team 1", score: 0, color: "bg-red-600" },
             { id: 1, name: "Team 2", score: 0, color: "bg-blue-600" },
             { id: 2, name: "Team 3", score: 0, color: "bg-green-600" },
-            { id: 3, name: "Team 4", score: 0, color: "bg-yellow-500 text-black" }
+            // UPDATED: Changed color class to a darker amber for better contrast
+            { id: 3, name: "Team 4", score: 0, color: "bg-amber-700 text-white" } 
         ]);
 
         const [ownerTeamIdx, setOwnerTeamIdx] = React.useState(0);
@@ -207,6 +223,7 @@
         const [showAnswer, setShowAnswer] = React.useState(false); // Only true when correct answer found OR all failed
         const [feedbackMsg, setFeedbackMsg] = React.useState(""); // "Wrong! Next Team..."
         const [isLocked, setIsLocked] = React.useState(false); // Prevents double clicks
+        const [showConfirmModal, setShowConfirmModal] = React.useState(false); // New State for Modal
         
         // Timer State
         const [timeLeft, setTimeLeft] = React.useState(60);
@@ -272,10 +289,18 @@
         const startGame = () => setGamePhase('rules'); // Transition to rules page
         
         const resetGame = () => {
-            if(confirm("Reset everything?")) {
-                localStorage.removeItem('triviaStateV12');
-                window.location.reload();
-            }
+            // FIX: Removed window.confirm to ensure the reset button works reliably in all environments.
+            localStorage.removeItem('triviaStateV12');
+            window.location.reload();
+        };
+
+        const endGameEarly = () => {
+            setShowConfirmModal(true);
+        };
+        
+        const confirmEndGame = () => {
+            setShowConfirmModal(false);
+            setGamePhase('finished');
         };
 
         const getCategories = () => {
@@ -359,9 +384,13 @@
         };
 
         const endQuizRound = () => {
-            setGamePhase('category_select');
-            setOwnerTeamIdx(prev => (prev + 1) % 4);
-            setQuizQueue([]);
+            if (getCategories().length === 0) {
+                 setGamePhase('finished');
+            } else {
+                setGamePhase('category_select');
+                setOwnerTeamIdx(prev => (prev + 1) % 4);
+                setQuizQueue([]);
+            }
         };
 
         const updateTeamName = (idx, val) => {
@@ -398,20 +427,70 @@
                     <div className="bg-slate-800 p-8 rounded-xl border border-slate-700 w-full max-w-2xl text-left animate-pop">
                         <h1 className="text-3xl font-bold text-center mb-6 text-white">Church Trivia Rules</h1>
                         <ol className="list-decimal list-inside space-y-4 text-slate-300 text-lg">
-                            <li>The <span className="font-bold text-white">Owner Team</span> (indicated by **YOUR TURN**) selects a **Category** to start a **{QUESTIONS_PER_ROUND}-question quiz round**.</li>
-                            <li>The Owner Team has **60 seconds** to answer. If correct, they earn the points, and the quiz continues.</li>
-                            <li>If the Owner Team answers **Wrong** OR **Time Runs Out**, the question is put up for a **Steal Attempt** by the next team in rotation (indicated by **STEALING!**).</li>
-                            <li>Stealing teams get a fresh **20 seconds** to answer. If correct, they earn the points, and the quiz continues.</li>
-                            <li>If a Stealing team answers **Wrong** or **Times Out**, the chance passes to the next team with a new 20-second timer.</li>
-                            <li>**If all 4 teams run out of time**, the question is discarded, and the game automatically moves to the next question.</li>
-                            <li>If the **last team answers wrong**, the correct answer is revealed before moving to the next question.</li>
-                            <li>After all {QUESTIONS_PER_ROUND} questions in the round are finished, the **Owner role passes to the next team** for the next category selection.</li>
+                            <li><span className="font-bold text-white">Category Selection:</span> The team whose score card says <span className="font-bold text-white">YOUR TURN</span> chooses a category to start a <span className="font-bold text-white">{QUESTIONS_PER_ROUND}-question quiz</span>.</li>
+                            <li><span className="font-bold text-white">Point Values:</span> <span className="font-bold text-purple-400">Pop Culture questions are worth 10 points</span>. All other categories are worth <span className="font-bold text-white">20 points</span>.</li>
+                            <li><span className="font-bold text-white">Answering Time:</span> The choosing team has <span className="font-bold text-white">60 seconds</span> to answer the question. If correct, they earn the points, and the quiz continues to the next question.</li>
+                            <li><span className="font-bold text-white">Steal Attempt:</span> If a team answers <span className="font-bold text-white">Wrong</span> OR <span className="font-bold text-white">Time Runs Out</span>, the question is put up for a steal. The next team in the rotation (marked <span className="font-bold text-white">STEALING!</span>) gets <span className="font-bold text-white">20 seconds</span> to answer.</li>
+                            <li><span className="font-bold text-white">Passing Steals:</span> If a stealing team misses (answers wrong or times out), the chance immediately passes to the next team in rotation with a fresh 20-second timer.</li>
+                            <li><span className="font-bold text-white">All Miss/Timeout:</span> If <span className="font-bold text-white">all 4 teams run out of time</span>, the question is discarded, and the game automatically moves to the next question without revealing the answer.</li>
+                            <li><span className="font-bold text-white">Last Team Misses:</span> If the <span className="font-bold text-white">final stealing team answers wrong</span> (before time runs out), the correct answer is revealed before moving to the next question.</li>
+                            <li><span className="font-bold text-white">End of Round:</span> After the {QUESTIONS_PER_ROUND}-question quiz is finished, the privilege to choose the next category passes to the next team in rotation.</li>
                         </ol>
                         <button onClick={() => setGamePhase('category_select')} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded mt-8">
                             Understood! Start Round 1
                         </button>
                         <button onClick={() => setGamePhase('setup')} className="w-full bg-transparent border border-slate-700 text-slate-400 font-bold py-2 rounded mt-4 hover:bg-slate-700">
                             Back to Setup
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        if (gamePhase === 'finished') {
+            const sortedTeams = [...teams].sort((a,b) => b.score - a.score);
+            const winner = sortedTeams[0];
+            const isTie = sortedTeams.length > 1 && winner.score === sortedTeams[1].score;
+
+            return (
+                <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6">
+                    <div className="text-center animate-pop bg-slate-800 p-8 rounded-xl border border-slate-700 shadow-2xl w-full max-w-4xl">
+                        <h1 className="text-5xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500">
+                            GAME OVER!
+                        </h1>
+                        
+                        {/* Winner/Podium Display */}
+                        <div className="mb-10 mt-10">
+                            {isTie ? (
+                                <h2 className="text-4xl text-white font-bold">It's a TIE!</h2>
+                            ) : (
+                                <>
+                                    <p className="text-xl text-slate-300 mb-2">The Champions Are:</p>
+                                    <div className={`inline-block p-6 rounded-2xl ${winner.color} animate-winner`}>
+                                        <h2 className="text-6xl font-black uppercase text-white tracking-widest">
+                                            {winner.name}
+                                        </h2>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Leaderboard */}
+                        <h3 className="text-2xl font-bold text-slate-300 mb-4">Final Leaderboard</h3>
+                        <div className="space-y-3 w-full max-w-lg mx-auto">
+                            {sortedTeams.map((t, i) => (
+                                <div key={i} className={`flex justify-between items-center p-4 rounded-lg text-xl transition-all duration-300 ${i === 0 && !isTie ? 'bg-yellow-400 text-black font-black scale-105 shadow-xl' : 'bg-slate-700 text-white'}`}>
+                                    <div className="flex items-center gap-4">
+                                        <span className={`font-bold ${i === 0 && !isTie ? 'text-black' : 'text-slate-400'}`}>#{i+1}</span>
+                                        <span>{t.name}</span>
+                                    </div>
+                                    <span className={`font-mono font-bold ${i === 0 && !isTie ? 'text-black' : 'text-green-400'}`}>{t.score} pts</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button onClick={resetGame} className="mt-8 px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded">
+                            Start New Game
                         </button>
                     </div>
                 </div>
@@ -453,12 +532,19 @@
                                 ))}
                             </div>
                             
-                            {getCategories().length === 0 && (
-                                <div className="mt-12">
-                                    <h3 className="text-2xl text-slate-400">No questions left!</h3>
-                                    <button onClick={() => setGamePhase('finished')} className="mt-4 px-8 py-3 bg-blue-600 rounded text-white">End Game</button>
-                                </div>
-                            )}
+                            {/* Manual End Game Button */}
+                            <div className="mt-12">
+                                {getCategories().length === 0 ? (
+                                    <h3 className="text-2xl text-slate-400">All questions used!</h3>
+                                ) : (
+                                    <button onClick={endGameEarly} className="px-6 py-2 bg-slate-700 text-red-400 rounded-lg font-bold hover:bg-slate-600 transition">
+                                        End Game
+                                    </button>
+                                )}
+                                {getCategories().length === 0 && (
+                                    <button onClick={() => setGamePhase('finished')} className="mt-4 ml-4 px-8 py-3 bg-blue-600 rounded text-white font-bold">Show Final Results</button>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -550,22 +636,22 @@
                             </div>
                         </div>
                     )}
-
-                    {gamePhase === 'finished' && (
-                        <div className="text-center animate-pop bg-slate-800 p-8 rounded-xl border border-slate-700 shadow-2xl">
-                            <h1 className="text-5xl font-bold text-white mb-8">Final Scores</h1>
-                            <div className="space-y-4 w-full max-w-md mx-auto">
-                                {[...teams].sort((a,b) => b.score - a.score).map((t, i) => (
-                                    <div key={i} className="flex justify-between items-center p-4 bg-slate-700 rounded text-xl">
-                                        <div className="flex items-center gap-3">
-                                            <span className="font-bold text-slate-400">#{i+1}</span>
-                                            <span>{t.name}</span>
-                                        </div>
-                                        <span className="font-mono font-bold text-green-400">{t.score}</span>
-                                    </div>
-                                ))}
+                    
+                    {/* End Game Confirmation Modal */}
+                    {showConfirmModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center animate-pop">
+                            <div className="bg-slate-700 p-8 rounded-xl w-full max-w-sm text-center shadow-2xl border-2 border-red-500">
+                                <h3 className="text-2xl font-bold mb-4 text-red-400">Are you sure?</h3>
+                                <p className="text-slate-300 mb-6">Ending the game now will determine the winner based on current scores.</p>
+                                <div className="flex justify-center space-x-4">
+                                    <button onClick={() => setShowConfirmModal(false)} className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded">
+                                        No, Continue Playing
+                                    </button>
+                                    <button onClick={confirmEndGame} className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded">
+                                        Yes, End Game
+                                    </button>
+                                </div>
                             </div>
-                            <button onClick={resetGame} className="mt-8 text-slate-400 hover:text-white underline">Start New Game</button>
                         </div>
                     )}
 
